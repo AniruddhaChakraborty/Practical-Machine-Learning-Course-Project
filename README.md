@@ -2,6 +2,12 @@
 
 # Weight Lifting Exercise Prediction (Coursera Practical Machine Learning Course Project)
 
+## This is a repo with gh-pages branch. The HTML page can be viewed online by clicking [on this Github link.](https://aniruddhachakraborty.github.io/Practical-Machine-Learning-Course-Project/ExercisePredictionWriteup.html)
+
+## R markdown, markdown and compiled HTML (Source code) files can be found in the repository itself. However, they can also be accessed by below links -
+* [ExercisePredictionWriteup.Rmd](https://github.com/AniruddhaChakraborty/Practical-Machine-Learning-Course-Project/blob/gh-pages/ExercisePredictionWriteup.Rmd): R markdown document for the course project, describing the analysis.
+* [ExercisePredictionWriteup.md](https://github.com/AniruddhaChakraborty/Practical-Machine-Learning-Course-Project/blob/gh-pages/ExercisePredictionWriteup.md): Markdown document for the course project, describing the analysis.
+* [ExercisePredictionWriteup.html](https://github.com/AniruddhaChakraborty/Practical-Machine-Learning-Course-Project/blob/gh-pages/ExercisePredictionWriteup.html): Compiled html file or Source code of html file.
 ## Synopsis
 
 Using devices such as **Jawbone Up, Nike FuelBand, and Fitbit** it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks.
