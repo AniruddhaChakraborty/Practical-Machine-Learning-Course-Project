@@ -1,0 +1,233 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Aniruddha Chakraborty"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE,message=FALSE,warning=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	tidy = TRUE,
+	tidy.opts = list(width.cutoff = 70)
+)
+```
+
+# Weight Lifting Exercise Prediction
+
+## **Synopsis**
+
+Using devices such as **Jawbone Up, Nike FuelBand, and Fitbit** it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks.
+
+In this project, we are given with data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.**The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set.**
+
+Following instructions have been given for the assignment -
+
+1. Any of the other variables may be used to predict.
+
+2. Report should describe -
+a) How the model was built?
+b) How cross validation was used?
+c) What is the expected out of sample error?
+d) Explaination about the choices made.
+
+3. Prediction model should be used to predict 20 different test cases.
+
+**We will build 3 models in this project using different Machine Learning Algorithms and cross validation and finally select the one with the least out of sample error. The best model will be used to predict different test cases.**
+
+## **Data Processing**
+
+### **1. Loading the data**
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. Let us download the datasets and load them through read.csv into train and test data frames. We will treat all the blank values, "NA", and "#DIV/0!" in the variables as NA. 
+```{r}
+## Download the csv files
+if(!file.exists("pml-training.csv")){
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", 
+		destfile = "pml-training.csv")
+}
+if(!file.exists("pml-testing.csv")){
+	download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", 
+		destfile = "pml-testing.csv")
+}      
+## Load the train and test datsets
+train <- read.csv("pml-training.csv", header = TRUE, na.strings=c("","NA", "#DIV/0!"))
+test <- read.csv("pml-testing.csv", header = TRUE, na.strings=c("","NA", "#DIV/0!"))
+```
+
+### **2. Preprocessing the data**
+
+We won't be able to run the Machine Learning Algorithms if there are NA values in the variables. Either we have to impute such values or remove the variables having high proportion of NA's from our analysis.
+
+Let us check the proportion of NA's for each variable.
+
+```{r}
+NAProp <- round(colMeans(is.na(train)), 2)
+table(NAProp)
+```
+
+**We can see from the above table that only 60 variables don't have any NA values. We will surely use these variables/features in the Machine Learning Algorithms.** Since, the remaining 100 variables have more than 98% of the values as NA, they won't help in building the prediction algorithms at all, so we can remove them from our analysis. 
+
+```{r}
+## Find the index of the 60 variables with 0% NA Values
+keep<-which(NAProp==0)
+
+## Subset the train and test datasets
+train<-train[,keep]
+test<-test[,keep]
+
+## Let us look at the first few variables
+str(train[, 1:15])
+```
+
+**We can see that the first 7 variables are not related to the data from accelerometers on the Belt, arm, dumbbell, and forearm of partcipants.** These variables are Row number, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window and they are not going to help us to predict the manner in which participants did the exercise. So, we can safely exclude these variables from our analysis.
+
+```{r}
+## Remove unwanted variables
+train <- train[, -(1:7)]
+test <- test[, -(1:7)]
+
+## Following predictors will be used to predict the outcome variable - "classe"
+names(train[,-53])
+```
+
+**Let us check the near zero variance of the covariates**, to identify those variables which have very little variability and will not be good predictors.
+
+```{r}
+library(caret)
+nzv<-nearZeroVar(train)
+nzv
+```
+
+**So, there are no variables with Near Zero Variance.**
+
+### **3. Data Partitioning**
+
+We will be predicting the outcome variable with our best model on the test dataset, which has only 20 observations. **Let us split our train dataset into Training and Probe datasets in the ratio 60:40.** Testing our model(s) on the Probe dataset will help us get an estimate of out of sample error.
+
+```{r}
+set.seed(2017)
+inTrain <- createDataPartition(train$classe, p=0.6,list=FALSE)
+Training<-train[inTrain,]
+Probe<-train[-inTrain,]
+
+## Let us look at the dimensions of Training, Probe and Test datasets
+dim(Training); dim(Probe); dim(test)
+```
+
+## **Building Models using Machine Learning Algorithms**
+
+**We will build 3 models in this project using different Machine Learning Algorithms and cross validation and finally select the one with the least out of sample error. The best model will be used to predict different test cases.** 
+
+The following classification models will be used to predict the 'classe' outcome variable -
+
+1. Classification and Regression Trees(CART) built using rpart package.
+2. Random forest model built using randomForest package
+3. Boosting with trees built using gbm.
+
+### Cross Validation
+
+Cross validation is done for all the models with number of times to do cross validation or K set as 3. We will use the train function of caret package to fit the models. Let us configure trainControl() object for k-fold cross validation with 3 folds.
+
+```{r}
+## Add additional argument for Random Forest for alowing parallel processing - allowParallel=TRUE
+TC<-trainControl(method="cv",number=3,classProbs = TRUE,allowParallel=TRUE)
+```
+
+### Fit the models
+Let us now use the train function of caret package to fit the models.
+
+```{r}
+set.seed(999)
+## 1. Build CART model 
+library(rpart)
+library(rattle)
+modelCART<-train(classe~.,data=Training,trControl=TC,method="rpart")
+
+## 2. Build Random Forest Model
+library(randomForest)
+modelRF<-train(classe~.,method="rf",data=Training,trControl=TC)
+
+## 3. Build Boosting with trees model with gbm
+library(gbm)
+modelGBM<-train(classe~.,data=Training,trControl=TC,method="gbm",verbose=FALSE)
+```
+
+## **Evaluating the Models**
+
+### In Sample Error Rates
+
+1. **CART Model**
+
+```{r}
+## Print the model parameters like cp, Accuracy
+print(modelCART)
+
+## Plot the final tree
+fancyRpartPlot(modelCART$finalModel)
+```
+
+**We can see that In Sample Error Rate (1-Accuracy) is about `r sprintf("%.2f",(1-modelCART$results$Accuracy[1]) * 100)`%, which is quite high.** But the final CART model is quite interpretable and we can see that roll_belt, pitch_forearm, magnet_dumbell and roll_forearm variables have been used to spilt. The final value used for the model was cp = `r modelCART$results$cp[1]`.
+
+2. **Random Forest Model**
+
+```{r}
+## Print the model parameters
+print(modelRF)
+```
+
+**We can see that In Sample Error Rate (1-Accuracy) is about `r sprintf("%.2f",(1-modelRF$results$Accuracy[2]) * 100)`%, which is extremely low.** It seems that this is our best model as the accuracy of `r sprintf("%.2f",modelRF$results$Accuracy[2]*100)`% is tough to beat for gbm model. The final parameter used for the model was mtry = 27.
+
+3. **Boosting with trees model**
+
+```{r}
+## Print the model parameters
+print(modelGBM)
+```
+
+Here, different trees with different interaction depths are used together to build a boosted version of classification tree. **In Sample Error Rate (1-Accuracy) for this model is about `r sprintf("%.2f",(1-modelGBM$results$Accuracy[9])*100)`%.** We can see that Accuracy is `r sprintf("%.2f",modelGBM$results$Accuracy[9]*100)`% for the final model where the parameters are n.trees = 150,interaction.depth = 3, shrinkage = 0.1 and n.minobsinnode = 10.
+
+## **Out of sample error**
+
+Let us compute the Out of sample error for the 3 models. We will do this by first predicting the outcome variable - 'classe' in the Probe dataset, for each of the models. **Then, we will get the Accuracy from confusionMatrix of Predictions and Actual Observations. Out of sample error is equal to 1-Accuracy.**
+```{r}
+## Predictions
+predCART <- predict(modelCART, newdata=Probe)
+predRF <- predict(modelRF, newdata=Probe)
+predGBM <- predict(modelGBM, newdata=Probe)
+
+## Confusion Matrix
+ConfCART <- confusionMatrix(predCART, Probe$classe)
+ConfRF <- confusionMatrix(predRF, Probe$classe)
+ConfGBM <- confusionMatrix(predGBM, Probe$classe)
+
+## Accuracy and Out of sample error
+Results <- data.frame(Model = c('CART', 'RF','GBM'),
+Accuracy = rbind(ConfCART$overall[1], ConfRF$overall[1], ConfGBM$overall[1]))
+Results$OutOfSampleError=1-Results$Accuracy
+print(Results)
+```
+
+**We can refer to the Results table and compare the performance of the models. Clearly, Random Forest model is the best one with an Accuracy of `r sprintf("%.2f",Results$Accuracy[2]*100)`% and it has the least Expected Out of Sample Error which is `r sprintf("%.2f",(1-Results$Accuracy[2])*100)`%.** Hence, we will use modelRF to predict the 20 different test cases given to us in the test data.
+
+## **Results**
+
+Here is the Confusion Matrix of the best model - Random Forest on the Probe set.
+
+```{r}
+ConfRF
+```
+
+**Now, we can apply the Random Forest model to the 20 given test cases for predicting classe variable.**
+
+```{r}
+predTest<-predict(modelRF,newdata=test)
+
+## Display the predicted values
+data.frame(problem_id=test$problem_id,classe=predTest)
+```
+
+**The above predicted values of classe variable are correctly classified with an accuracy of 100% for the test data set, which has been verified in the Course Project Prediction Quiz.**
